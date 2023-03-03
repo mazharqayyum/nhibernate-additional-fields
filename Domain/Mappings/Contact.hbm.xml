@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2" assembly="NibernateAditionalFields" namespace="NibernateAditionalFields.Domain">
+	<class name="Contact" table="Contacts">
+		<id name="Id" column="ContactId">
+			<generator class="native" />
+		</id>
+		<property name="Name" column="Name" />
+		<property name="Phone" column="Phone" />
+		<property name="Email" column="Email" />
+		<join table="Contacts_Custom" optional="true">
+			<key column="ContactId" />
+			<dynamic-component name="Additional">
+				<property name="Company" column="Company" type="string" />
+				<property name="IsPermanent" column="IsPermanent" type="bool" />
+				<property name="ETagNumber" column="ETagNumber" type="int" />
+			</dynamic-component>
+		</join>
+	</class>
+</hibernate-mapping>
