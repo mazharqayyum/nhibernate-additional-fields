@@ -5,10 +5,13 @@ using NHibernate.Connection;
 using NHibernate.Criterion;
 using NHibernate.Dialect;
 using NHibernate.Driver;
+using NHibernate.Mapping;
 using NHibernate.Mapping.ByCode;
+using NHibernate.Util;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -45,6 +48,7 @@ namespace NibernateAditionalFields
 
         private ISessionFactory CreateSessionFactory()
         {
+            string connectionString = NibernateAditionalFields.Properties.Settings.Default.ConnectionString;
             if (Configuration == null)
             {
                 var mapper = new ModelMapper();
@@ -52,33 +56,38 @@ namespace NibernateAditionalFields
                 HbmMapping domainMapping = mapper.CompileMappingForAllExplicitlyAddedEntities();
 
                 Configuration = new NHibernate.Cfg.Configuration();
-                string connectionString = NibernateAditionalFields.Properties.Settings.Default.ConnectionString;
                 SetupForSQLServer(connectionString);
                 Configuration.AddAssembly(Assembly.GetExecutingAssembly());
 
             }
 
-            //foreach (var mapping in Configuration.ClassMappings)
-            //{
-            //    foreach (var join in mapping.JoinIterator)
-            //    {
-            //        var table = join.Table;
-            //        if (table != null && table.Name.EndsWith("_Custom"))
-            //        {
-            //            foreach (var property in join.PropertyIterator)
-            //            {
-            //                if (property.Name == "Additional")
-            //                {
-            //                    var component = property.Value as NHibernate.Mapping.Component;
-            //                    NHibernate.Mapping.Property field = new NHibernate.Mapping.Property();
-            //                    field.Name = "Company";
-                                
-            //                    component.AddProperty(field);
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
+            foreach (var mapping in Configuration.ClassMappings)
+            {
+                foreach (var join in mapping.JoinIterator)
+                {
+                    var table = join.Table;
+                    if (table != null && table.Name.EndsWith("_Custom"))
+                    {
+                        foreach (var property in join.PropertyIterator)
+                        {
+                            if (property.Name == "Additional")
+                            {
+                                var component = property.Value as NHibernate.Mapping.Component;
+                                var columns = GetColumns(table.Name, connectionString);
+                                foreach (string name in columns.Keys)
+                                {
+                                    SimpleValue value = new SimpleValue(table);
+                                    value.AddColumn(new Column(name));
+                                    value.TypeName = MapType(columns[name]);
+                                    NHibernate.Mapping.Property field = new NHibernate.Mapping.Property(value);
+                                    field.Name = name;
+                                    component.AddProperty(field);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             return Configuration.BuildSessionFactory();
         }
@@ -101,25 +110,53 @@ namespace NibernateAditionalFields
             });
         }
 
-        private void SetupForSQLLite(string dbName)
+        private Dictionary<string, string> GetColumns(string tableName, string connectionString) 
         {
-            var dbPath = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), dbName);
-            var conString = $"Data Source ={dbPath};Version=3;New=True;Compress=True;";
-
-            Configuration.DataBaseIntegration(x =>
+            Dictionary<string,string> columns = new Dictionary<string, string>();
+            SqlConnection connection = new SqlConnection(connectionString);
+            try
             {
-                x.Driver<SQLite20Driver>();
-                x.Dialect<SQLiteDialect>();
-                x.ConnectionProvider<DriverConnectionProvider>();
-                x.ConnectionString = conString;
-                x.KeywordsAutoImport = Hbm2DDLKeyWords.AutoQuote;
-                x.Timeout = 255;
-                x.BatchSize = 100;
-                x.LogFormattedSql = true;
-                x.LogSqlInConsole = true;
-                x.AutoCommentSql = false;
-                x.ConnectionReleaseMode = ConnectionReleaseMode.OnClose;
-            });
+                connection.Open();
+                string query = $"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'{tableName}'";
+                SqlCommand command = new SqlCommand(query, connection);
+                using (var reader = command.ExecuteReader()) 
+                {
+                    int index = 0;
+                    while (reader.Read())
+                    {
+                        if (index++ == 0)
+                            continue;
+                        string name = reader["COLUMN_NAME"] as string;
+                        string type = reader["DATA_TYPE"] as string;
+                        columns.Add(name, type);                    
+                    }
+                    reader.Close();
+                }
+            }
+            catch
+            {
+            }
+            finally 
+            {
+                if (connection.State == System.Data.ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+            return columns;
+        }
+
+        private string MapType(string dbType) 
+        {
+            // very basic type map as proof of concept
+            var typeMap = new Dictionary<string, string>()
+            {
+                { "nvarchar", NHibernateUtil.String.Name },
+                { "bit", NHibernateUtil.Boolean.Name },
+                { "int", NHibernateUtil.Int32.Name },
+            };
+
+            return typeMap[dbType.ToLower()];
         }
     }
 }

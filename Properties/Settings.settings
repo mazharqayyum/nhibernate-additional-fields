@@ -3,7 +3,7 @@
   <Profiles />
   <Settings>
     <Setting Name="ConnectionString" Type="System.String" Scope="User">
-      <Value Profile="(Default)">Server=DESKTOP-C8HI84B;Database=AdditionalFields;User Id=mazhar;Password=password;</Value>
+      <Value Profile="(Default)">Server=DESKTOP-05QD5TK;Database=AdditionalFields;User Id=mazhar;Password=password;</Value>
     </Setting>
   </Settings>
 </SettingsFile>

@@ -10,9 +10,9 @@
 		<join table="Contacts_Custom" optional="true">
 			<key column="ContactId" />
 			<dynamic-component name="Additional">
-				<property name="Company" column="Company" type="string" />
+				<!--<property name="Company" column="Company" type="string" />
 				<property name="IsPermanent" column="IsPermanent" type="bool" />
-				<property name="ETagNumber" column="ETagNumber" type="int" />
+				<property name="ETagNumber" column="ETagNumber" type="int" />-->
 			</dynamic-component>
 		</join>
 	</class>
